@@ -13,21 +13,35 @@ Options:
 """
 
 from docopt import docopt
+import http.client as http_client
 import logging
-import requests
 from typing import AnyStr, List, Optional
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
 def get_url_contents(url: AnyStr) -> Optional[AnyStr]:
-  response = requests.get(url, allow_redirects=True)
-  if response.status_code != requests.codes.ok:
-    logger.error(f"Unexpected status code {response.status_code} when accessing url {url}")
+  headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36"}
+
+  request_parts = url.split("//")
+  endpoint_parts = request_parts[1].split("/")
+  domain = endpoint_parts[0]
+  endpoint = "/" + "/".join(endpoint_parts[1:])
+
+  conn = http_client.HTTPSConnection(domain)
+  conn.request("GET", endpoint, None, headers)
+  response = conn.getresponse()
+
+  if response.status == 301:
+    print(response.headers)
+    return get_url_contents(response.headers.get("Location"))
+
+  if response.status != 200:
+    logger.error(f"Unexpected status code {response.status} when accessing url {url}")
     return None
 
   logger.info(f"Retrieved contents of {url}")
-  return response.text
+  return response.read()
 
 def scrape_forum(url: AnyStr):
   _ = get_url_contents(url)
