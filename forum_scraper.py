@@ -14,13 +14,23 @@ Options:
 
 from docopt import docopt
 import logging
-from typing import List, AnyStr
+import requests
+from typing import AnyStr, List, Optional
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
+def get_url_contents(url: AnyStr) -> Optional[AnyStr]:
+  response = requests.get(url, allow_redirects=True)
+  if response.status_code != requests.codes.ok:
+    logger.error(f"Unexpected status code {response.status_code} when accessing url {url}")
+    return None
+
+  logger.info(f"Retrieved contents of {url}")
+  return response.text
+
 def scrape_forum(url: AnyStr):
-  return
+  _ = get_url_contents(url)
 
 def scrape_forums(urls: List[AnyStr]):
   for url in urls:
