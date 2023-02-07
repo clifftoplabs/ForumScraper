@@ -12,6 +12,7 @@ Options:
   -v                                                Verbose
 """
 
+from bs4 import BeautifulSoup
 from docopt import docopt
 import http.client as http_client
 import logging
@@ -44,7 +45,12 @@ def get_url_contents(url: AnyStr) -> Optional[AnyStr]:
   return response.read()
 
 def scrape_forum(url: AnyStr):
-  _ = get_url_contents(url)
+  url_contents = get_url_contents(url)
+  with open("output.txt", "w+") as fp:
+    fp.write(url_contents.decode("utf-8"))
+  soup = BeautifulSoup(url_contents, "html.parser")
+  posts = soup.find(id="posts")
+  print(len(posts.contents))
 
 def scrape_forums(urls: List[AnyStr]):
   for url in urls:
