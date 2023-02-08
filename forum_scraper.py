@@ -93,9 +93,18 @@ class TablePostsForumParser(ForumParser):
     if len(date_order_cols) < 2:
       return
 
+    user_contents_cols = rows[1].find_all("td")
+    if len(user_contents_cols) < 2:
+      return
+
     post.date = self.clean_string(date_order_cols[0])
-    post.order = int(self.clean_string(date_order_cols[1]).replace("#", ""))
-    post.contents = self.clean_string(rows[1].find(class_="thePostItself"))
+    try:
+      post.order = int(self.clean_string(date_order_cols[1]).replace("#", ""))
+    except:
+      post.order = -1
+    post.username = self.clean_string(user_contents_cols[0].find(class_="bigusername"))
+    post.title = self.clean_string(user_contents_cols[1].find("div", id=False))
+    post.contents = self.clean_string(user_contents_cols[1].find(class_="thePostItself"))
 
     self.posts.append(post)
 
@@ -114,7 +123,10 @@ class ListPostsForumParser(ForumParser):
     post_header = list_post.find(class_="posthead")
     post.date = self.clean_string(post_header.find(class_="postdate"))
     post.order = int(self.clean_string(post_header.find(class_="nodecontrols")).replace("#", ""))
-    post_body = list_post.find(class_="postbody")
+    post_details = list_post.find(class_="postdetails")
+    user_info = post_details.find(class_="userinfo")
+    post.username = self.clean_string(user_info.find(class_="username"))
+    post_body = post_details.find(class_="postbody")
     post.title = self.clean_string(post_body.find(class_="title"))
     post.contents = self.clean_string(post_body.find(class_="content"))
 
