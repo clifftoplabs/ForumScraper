@@ -43,17 +43,19 @@ def get_url_contents(url: AnyStr) -> Optional[AnyStr]:
   logger.info(f"Retrieved contents of {url}")
   return response.read()
 
-def scrape_forum(url: AnyStr):
+def scrape_forum(url: AnyStr) -> AnyStr:
   url_contents = get_url_contents(url)
-  with open("output.txt", "w+") as fp:
-    fp.write(url_contents.decode("utf-8"))
   soup = BeautifulSoup(url_contents, "html.parser")
   posts = soup.find(id="posts")
   logger.debug(len(posts.contents))
+  return url_contents.decode("utf-8")
 
-def scrape_forums(urls: List[AnyStr]):
-  for url in urls:
-    scrape_forum(url)
+def scrape_forums(urls: List[AnyStr], is_debug: bool):
+  with open(f"output.txt", "w+") as fp:
+    for url in urls:
+      contents = scrape_forum(url)
+      if is_debug:
+        fp.write(contents)
 
 def get_urls(input_file: AnyStr, csv_urls: AnyStr):
   # TODO: Implement reading input for URLs
@@ -74,7 +76,7 @@ def main():
   urls = get_urls(args.get("--input-file"), args.get("--csv-urls"))
 
   # Scrape each forum from the urls
-  scrape_forums(urls)
+  scrape_forums(urls, args.get("--verbose"))
 
 if __name__ == "__main__":
     main()
