@@ -14,9 +14,11 @@ Options:
 
 from bs4 import BeautifulSoup
 from bs4.element import PageElement
+from datetime import datetime
 from docopt import docopt
 from enum import Enum
 import http.client as http_client
+import json
 import logging
 from typing import Any, AnyStr, Dict, List, Optional
 
@@ -29,7 +31,22 @@ class SoftwareType(Enum):
   LIST_POSTS = 2
 
 class ForumPost:
-  pass
+  def __init__(self):
+    self.date: Optional[datetime] = None
+    # TODO: Promote to user object that is unique by username and collects other user data
+    self.username: Optional[AnyStr] = None
+    self.title: Optional[AnyStr] = None
+    self.contents: Optional[AnyStr] = None
+    self.order: Optional[int] = None
+
+  def to_json(self):
+    return {
+      "date": self.date,
+      "user": self.username,
+      "title": self.title,
+      "contents": self.contents,
+      "order": self.order,
+    }
 
 class ForumParser:
   def __init__(self, software: SoftwareType, config: Dict[AnyStr, Any] = dict()):
@@ -49,6 +66,12 @@ class ForumParser:
   def parse(self, posts_container: PageElement):
     raise NotImplementedError("Must implement parse method in subclass")
 
+  def clean_string(self, element: PageElement) -> AnyStr:
+    return "".join(element.strings).strip()
+
+  def to_json(self):
+    return [post.to_json() for post in self.posts]
+
 # TODO: Dry up these parse functions by using a config to define the search terms
 class TablePostsForumParser(ForumParser):
   def parse(self, posts_container: PageElement):
@@ -59,7 +82,21 @@ class TablePostsForumParser(ForumParser):
       self.parse_table_post(table_post)
 
   def parse_table_post(self, table_post: PageElement):
-    pass
+    post = ForumPost()
+    rows = table_post.find_all("tr")
+    if len(rows) < 2:
+      return
+
+    date_order_cols = rows[0].find_all("td")
+    if len(date_order_cols) < 2:
+      return
+
+    post.date = self.clean_string(date_order_cols[0])
+    post.order = self.clean_string(date_order_cols[1])
+    post.contents = self.clean_string(rows[1].find(class_="thePostItself"))
+
+    self.posts.append(post)
+
 
 class ListPostsForumParser(ForumParser):
   def parse(self, posts_container: PageElement):
@@ -105,14 +142,14 @@ def scrape_forum(url: AnyStr) -> AnyStr:
   forum_parser = ForumParser.for_software(software)
   forum_parser.parse(posts)
 
-  return url_contents.decode("utf-8")
+  return json.dumps(forum_parser.to_json(), indent=2)
 
 def scrape_forums(urls: List[AnyStr], is_debug: bool):
   with open(f"output.txt", "w+") as fp:
     for url in urls:
       contents = scrape_forum(url)
       if is_debug:
-        fp.write(contents)
+        fp.write(contents + "\n\n")
 
 def get_urls(input_file: AnyStr, csv_urls: AnyStr):
   # TODO: Implement reading input for URLs
