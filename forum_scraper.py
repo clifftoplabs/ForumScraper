@@ -13,13 +13,20 @@ Options:
 """
 
 from bs4 import BeautifulSoup
+from bs4.element import PageElement
 from docopt import docopt
+from enum import Enum
 import http.client as http_client
 import logging
-from typing import AnyStr, List, Optional
+from typing import Any, AnyStr, Dict, List, Optional
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+class SoftwareType(Enum):
+  CUSTOM = 0
+  TABLE_POSTS = 1
+  LIST_POSTS = 2
 
 def get_url_contents(url: AnyStr) -> Optional[AnyStr]:
   headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36"}
@@ -43,11 +50,35 @@ def get_url_contents(url: AnyStr) -> Optional[AnyStr]:
   logger.info(f"Retrieved contents of {url}")
   return response.read()
 
+# TODO: Dry up these functions by using a config to define the search terms
+def parse_table_posts_forum(posts_container: PageElement):
+  logger.debug(f"Parsing table posts - Element Count: {len(posts_container.contents)}")
+
+def parse_list_posts_forum(posts_container: PageElement):
+  logger.debug(f"Parsing list posts - Element Count: {len(posts_container.contents)}")
+
+def parse_forum_with_config(posts_container: PageElement, config: Dict[AnyStr, Any]):
+  logger.debug(f"Parsing custom software - Element Count: {len(posts_container.contents)} | Config: {config}")
+
 def scrape_forum(url: AnyStr) -> AnyStr:
   url_contents = get_url_contents(url)
   soup = BeautifulSoup(url_contents, "html.parser")
   posts = soup.find(id="posts")
-  logger.debug(len(posts.contents))
+
+  software = SoftwareType.CUSTOM
+  if posts.name == "ol":
+    software = SoftwareType.LIST_POSTS
+  if posts.name == "div" and posts.table is not None:
+    software = SoftwareType.TABLE_POSTS
+
+  if software == SoftwareType.TABLE_POSTS:
+    parse_table_posts_forum(posts)
+  elif software == SoftwareType.LIST_POSTS:
+    parse_list_posts_forum(posts)
+  else:
+    # TODO: Support passing in a custom config
+    parse_forum_with_config(posts, {})
+
   return url_contents.decode("utf-8")
 
 def scrape_forums(urls: List[AnyStr], is_debug: bool):
