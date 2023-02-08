@@ -28,6 +28,47 @@ class SoftwareType(Enum):
   TABLE_POSTS = 1
   LIST_POSTS = 2
 
+class ForumPost:
+  pass
+
+class ForumParser:
+  def __init__(self, software: SoftwareType, config: Dict[AnyStr, Any] = dict()):
+    self.software = software
+    self.config = config
+    self.posts: List[ForumPost] = []
+
+  @staticmethod
+  def for_software(software: SoftwareType):
+    if software == SoftwareType.TABLE_POSTS:
+      return TablePostsForumParser(software)
+    if software == SoftwareType.LIST_POSTS:
+      return ListPostsForumParser(software)
+
+    return CustomForumParser(software, {})
+
+  def parse(self, posts_container: PageElement):
+    raise NotImplementedError("Must implement parse method in subclass")
+
+# TODO: Dry up these parse functions by using a config to define the search terms
+class TablePostsForumParser(ForumParser):
+  def parse(self, posts_container: PageElement):
+    logger.debug(f"Parsing table posts - Element Count: {len(posts_container.contents)}")
+
+    table_posts = posts_container.find_all("table", id=True)
+    for table_post in table_posts:
+      self.parse_table_post(table_post)
+
+  def parse_table_post(self, table_post: PageElement):
+    pass
+
+class ListPostsForumParser(ForumParser):
+  def parse(self, posts_container: PageElement):
+    logger.debug(f"Parsing list posts - Element Count: {len(posts_container.contents)}")
+
+class CustomForumParser(ForumParser):
+  def parse(self, posts_container: PageElement):
+    logger.debug(f"Parsing custom software - Element Count: {len(posts_container.contents)} | Config: {self.config}")
+
 def get_url_contents(url: AnyStr) -> Optional[AnyStr]:
   headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36"}
 
@@ -50,16 +91,6 @@ def get_url_contents(url: AnyStr) -> Optional[AnyStr]:
   logger.info(f"Retrieved contents of {url}")
   return response.read()
 
-# TODO: Dry up these functions by using a config to define the search terms
-def parse_table_posts_forum(posts_container: PageElement):
-  logger.debug(f"Parsing table posts - Element Count: {len(posts_container.contents)}")
-
-def parse_list_posts_forum(posts_container: PageElement):
-  logger.debug(f"Parsing list posts - Element Count: {len(posts_container.contents)}")
-
-def parse_forum_with_config(posts_container: PageElement, config: Dict[AnyStr, Any]):
-  logger.debug(f"Parsing custom software - Element Count: {len(posts_container.contents)} | Config: {config}")
-
 def scrape_forum(url: AnyStr) -> AnyStr:
   url_contents = get_url_contents(url)
   soup = BeautifulSoup(url_contents, "html.parser")
@@ -71,13 +102,8 @@ def scrape_forum(url: AnyStr) -> AnyStr:
   if posts.name == "div" and posts.table is not None:
     software = SoftwareType.TABLE_POSTS
 
-  if software == SoftwareType.TABLE_POSTS:
-    parse_table_posts_forum(posts)
-  elif software == SoftwareType.LIST_POSTS:
-    parse_list_posts_forum(posts)
-  else:
-    # TODO: Support passing in a custom config
-    parse_forum_with_config(posts, {})
+  forum_parser = ForumParser.for_software(software)
+  forum_parser.parse(posts)
 
   return url_contents.decode("utf-8")
 
