@@ -9,7 +9,7 @@ Options:
   -f <urls_filename>, --input-file <urls_filename>  Text file with a forum url per line
   -u <csv_urls>, --csv-urls <csv_urls>              URLs of forums separated by a comma
   -h, --help                                        Show this screen.
-  -v                                                Verbose
+  -v, --verbose                                     Verbose
 """
 
 from bs4 import BeautifulSoup
@@ -34,7 +34,6 @@ def get_url_contents(url: AnyStr) -> Optional[AnyStr]:
   response = conn.getresponse()
 
   if response.status == 301:
-    print(response.headers)
     return get_url_contents(response.headers.get("Location"))
 
   if response.status != 200:

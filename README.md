@@ -1,5 +1,5 @@
 # Forum Scraper
-Simple utility to run
+Simple utility to scrape data forum data from specified URLs
 
 ## Install
 Create a virtual environment and install the dependencies
