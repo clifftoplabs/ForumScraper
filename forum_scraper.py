@@ -66,7 +66,9 @@ class ForumParser:
   def parse(self, posts_container: PageElement):
     raise NotImplementedError("Must implement parse method in subclass")
 
-  def clean_string(self, element: PageElement) -> AnyStr:
+  def clean_string(self, element: PageElement) -> Optional[AnyStr]:
+    if element is None:
+      return None
     return "".join(element.strings).strip()
 
   def to_json(self):
@@ -92,7 +94,7 @@ class TablePostsForumParser(ForumParser):
       return
 
     post.date = self.clean_string(date_order_cols[0])
-    post.order = self.clean_string(date_order_cols[1])
+    post.order = int(self.clean_string(date_order_cols[1]).replace("#", ""))
     post.contents = self.clean_string(rows[1].find(class_="thePostItself"))
 
     self.posts.append(post)
@@ -101,6 +103,22 @@ class TablePostsForumParser(ForumParser):
 class ListPostsForumParser(ForumParser):
   def parse(self, posts_container: PageElement):
     logger.debug(f"Parsing list posts - Element Count: {len(posts_container.contents)}")
+
+    list_posts = posts_container.find_all("li", class_="postcontainer")
+    for list_post in list_posts:
+      self.parse_list_post(list_post)
+
+  def parse_list_post(self, list_post: PageElement):
+    post = ForumPost()
+
+    post_header = list_post.find(class_="posthead")
+    post.date = self.clean_string(post_header.find(class_="postdate"))
+    post.order = int(self.clean_string(post_header.find(class_="nodecontrols")).replace("#", ""))
+    post_body = list_post.find(class_="postbody")
+    post.title = self.clean_string(post_body.find(class_="title"))
+    post.contents = self.clean_string(post_body.find(class_="content"))
+
+    self.posts.append(post)
 
 class CustomForumParser(ForumParser):
   def parse(self, posts_container: PageElement):
