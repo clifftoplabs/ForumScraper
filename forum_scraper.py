@@ -2,7 +2,7 @@
 Forum Scraper
 
 Usage:
-  forum_scraper -f <urls_filename> | -u <csv_urls> [-v]
+  forum_scraper (-f <urls_filename> | -u <csv_urls>) [-v]
   forum_scraper -h | --help
 
 Options:
@@ -18,8 +18,8 @@ import http.client as http_client
 import logging
 from typing import AnyStr, List, Optional
 
-logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 def get_url_contents(url: AnyStr) -> Optional[AnyStr]:
   headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36"}
@@ -49,7 +49,7 @@ def scrape_forum(url: AnyStr):
     fp.write(url_contents.decode("utf-8"))
   soup = BeautifulSoup(url_contents, "html.parser")
   posts = soup.find(id="posts")
-  print(len(posts.contents))
+  logger.debug(len(posts.contents))
 
 def scrape_forums(urls: List[AnyStr]):
   for url in urls:
@@ -66,6 +66,9 @@ def get_urls(input_file: AnyStr, csv_urls: AnyStr):
 def main():
   # Parse the input arguments to get the run options and urls filename or csv
   args = docopt(__doc__, version='Forum Scraper v0.1')
+
+  if args.get("--verbose"):
+    logger.setLevel(logging.DEBUG)
 
   # Read the list of URLs
   urls = get_urls(args.get("--input-file"), args.get("--csv-urls"))
