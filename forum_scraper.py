@@ -79,32 +79,23 @@ class TablePostsForumParser(ForumParser):
   def parse(self, posts_container: PageElement):
     logger.debug(f"Parsing table posts - Element Count: {len(posts_container.contents)}")
 
-    table_posts = posts_container.find_all("table", id=True)
+    table_posts = posts_container.select("table[id]")
     for table_post in table_posts:
       self.parse_table_post(table_post)
 
   def parse_table_post(self, table_post: PageElement):
     post = ForumPost()
-    rows = table_post.find_all("tr")
-    if len(rows) < 2:
-      return
 
-    date_order_cols = rows[0].find_all("td")
-    if len(date_order_cols) < 2:
-      return
+    post_header = table_post.select_one("tr:first-of-type")
+    post.date = self.clean_string(post_header.select_one("td:first-of-type"))
+    post.order = int(self.clean_string(post_header.select_one("td:nth-of-type(2)")).replace("#", ""))
 
-    user_contents_cols = rows[1].find_all("td")
-    if len(user_contents_cols) < 2:
-      return
-
-    post.date = self.clean_string(date_order_cols[0])
-    try:
-      post.order = int(self.clean_string(date_order_cols[1]).replace("#", ""))
-    except:
-      post.order = -1
-    post.username = self.clean_string(user_contents_cols[0].find(class_="bigusername"))
-    post.title = self.clean_string(user_contents_cols[1].find("div", id=False))
-    post.contents = self.clean_string(user_contents_cols[1].find(class_="thePostItself"))
+    post_details = table_post.select_one("tr:nth-of-type(2)")
+    user_info = post_details.select_one("td:first-of-type")
+    post.username = self.clean_string(user_info.select_one(".bigusername"))
+    post_body = post_details.select_one("td:nth-of-type(2)")
+    post.title = self.clean_string(post_body.select_one("div:not([id])"))
+    post.contents = self.clean_string(post_body.select_one(".thePostItself"))
 
     self.posts.append(post)
 
@@ -113,22 +104,23 @@ class ListPostsForumParser(ForumParser):
   def parse(self, posts_container: PageElement):
     logger.debug(f"Parsing list posts - Element Count: {len(posts_container.contents)}")
 
-    list_posts = posts_container.find_all("li", class_="postcontainer")
+    list_posts = posts_container.select("li.postcontainer")
     for list_post in list_posts:
       self.parse_list_post(list_post)
 
   def parse_list_post(self, list_post: PageElement):
     post = ForumPost()
 
-    post_header = list_post.find(class_="posthead")
-    post.date = self.clean_string(post_header.find(class_="postdate"))
-    post.order = int(self.clean_string(post_header.find(class_="nodecontrols")).replace("#", ""))
-    post_details = list_post.find(class_="postdetails")
-    user_info = post_details.find(class_="userinfo")
-    post.username = self.clean_string(user_info.find(class_="username"))
-    post_body = post_details.find(class_="postbody")
-    post.title = self.clean_string(post_body.find(class_="title"))
-    post.contents = self.clean_string(post_body.find(class_="content"))
+    post_header = list_post.select_one(".posthead")
+    post.date = self.clean_string(post_header.select_one(".postdate"))
+    post.order = int(self.clean_string(post_header.select_one(".nodecontrols")).replace("#", ""))
+
+    post_details = list_post.select_one(".postdetails")
+    user_info = post_details.select_one(".userinfo")
+    post.username = self.clean_string(user_info.select_one(".username"))
+    post_body = post_details.select_one(".postbody")
+    post.title = self.clean_string(post_body.select_one(".title"))
+    post.contents = self.clean_string(post_body.select_one(".content"))
 
     self.posts.append(post)
 
