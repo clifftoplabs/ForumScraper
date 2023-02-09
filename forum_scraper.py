@@ -23,12 +23,70 @@ import logging
 from typing import Any, AnyStr, Dict, List, Optional
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("forum_scraper")
 
 class SoftwareType(Enum):
   CUSTOM = 0
   TABLE_POSTS = 1
   LIST_POSTS = 2
+
+
+class ParserConfig:
+  def __init__(
+    self,
+    posts_container: AnyStr,
+    posts: AnyStr,
+    post_header: AnyStr,
+    post_date: AnyStr,
+    post_order: AnyStr,
+    post_details: AnyStr,
+    post_user_info: AnyStr,
+    post_username: AnyStr,
+    post_body: AnyStr,
+    post_title: AnyStr,
+    post_contents: AnyStr,
+  ):
+    self.posts_container = posts_container
+    self.posts = posts
+    self.post_header = post_header
+    self.post_date = post_date
+    self.post_order = post_order
+    self.post_details = post_details
+    self.post_user_info = post_user_info
+    self.post_username = post_username
+    self.post_body = post_body
+    self.post_title = post_title
+    self.post_contents = post_contents
+
+
+DEFAULT_CONFIGS = {
+  "vBulletin 3.8.11": ParserConfig(
+    posts_container="#posts",
+    posts="table[id]",
+    post_header="tr:first-of-type",
+    post_date="td:first-of-type",
+    post_order="td:nth-of-type(2)",
+    post_details="tr:nth-of-type(2)",
+    post_user_info="td:first-of-type",
+    post_username=".bigusername",
+    post_body="td:nth-of-type(2)",
+    post_title="div:not([id])",
+    post_contents=".thePostItself"
+  ),
+  "vBulletin 4.2.2": ParserConfig(
+    posts_container="#posts",
+    posts="li.postcontainer",
+    post_header=".posthead",
+    post_date=".postdate",
+    post_order=".nodecontrols",
+    post_details=".postdetails",
+    post_user_info=".userinfo",
+    post_username=".username",
+    post_body=".postbody",
+    post_title=".title",
+    post_contents=".content"
+  ),
+}
 
 class ForumPost:
   def __init__(self):
@@ -49,22 +107,34 @@ class ForumPost:
     }
 
 class ForumParser:
-  def __init__(self, software: SoftwareType, config: Dict[AnyStr, Any] = dict()):
+  def __init__(self, software: SoftwareType, config: ParserConfig):
     self.software = software
     self.config = config
     self.posts: List[ForumPost] = []
 
-  @staticmethod
-  def for_software(software: SoftwareType):
-    if software == SoftwareType.TABLE_POSTS:
-      return TablePostsForumParser(software)
-    if software == SoftwareType.LIST_POSTS:
-      return ListPostsForumParser(software)
+  def parse(self, soup: BeautifulSoup):
+    posts_container = soup.select_one(self.config.posts_container)
+    posts = posts_container.select(self.config.posts)
 
-    return CustomForumParser(software, {})
+    logger.debug(f"Parsing {self.software} posts - Post Count: {len(posts)}")
+    for post_element in posts:
+      self.parse_post(post_element)
 
-  def parse(self, posts_container: PageElement):
-    raise NotImplementedError("Must implement parse method in subclass")
+  def parse_post(self, post_element: PageElement):
+    post = ForumPost()
+
+    post_header = post_element.select_one(self.config.post_header)
+    post.date = self.clean_string(post_header.select_one(self.config.post_date))
+    post.order = int(self.clean_string(post_header.select_one(self.config.post_order)).replace("#", ""))
+
+    post_details = post_element.select_one(self.config.post_details)
+    post_user_info = post_details.select_one(self.config.post_user_info)
+    post.username = self.clean_string(post_user_info.select_one(self.config.post_username))
+    post_body = post_details.select_one(self.config.post_body)
+    post.title = self.clean_string(post_body.select_one(self.config.post_title))
+    post.contents = self.clean_string(post_body.select_one(self.config.post_contents))
+
+    self.posts.append(post)
 
   def clean_string(self, element: PageElement) -> Optional[AnyStr]:
     if element is None:
@@ -74,59 +144,6 @@ class ForumParser:
   def to_json(self):
     return [post.to_json() for post in self.posts]
 
-# TODO: Dry up these parse functions by using a config to define the search terms
-class TablePostsForumParser(ForumParser):
-  def parse(self, posts_container: PageElement):
-    logger.debug(f"Parsing table posts - Element Count: {len(posts_container.contents)}")
-
-    table_posts = posts_container.select("table[id]")
-    for table_post in table_posts:
-      self.parse_table_post(table_post)
-
-  def parse_table_post(self, table_post: PageElement):
-    post = ForumPost()
-
-    post_header = table_post.select_one("tr:first-of-type")
-    post.date = self.clean_string(post_header.select_one("td:first-of-type"))
-    post.order = int(self.clean_string(post_header.select_one("td:nth-of-type(2)")).replace("#", ""))
-
-    post_details = table_post.select_one("tr:nth-of-type(2)")
-    user_info = post_details.select_one("td:first-of-type")
-    post.username = self.clean_string(user_info.select_one(".bigusername"))
-    post_body = post_details.select_one("td:nth-of-type(2)")
-    post.title = self.clean_string(post_body.select_one("div:not([id])"))
-    post.contents = self.clean_string(post_body.select_one(".thePostItself"))
-
-    self.posts.append(post)
-
-
-class ListPostsForumParser(ForumParser):
-  def parse(self, posts_container: PageElement):
-    logger.debug(f"Parsing list posts - Element Count: {len(posts_container.contents)}")
-
-    list_posts = posts_container.select("li.postcontainer")
-    for list_post in list_posts:
-      self.parse_list_post(list_post)
-
-  def parse_list_post(self, list_post: PageElement):
-    post = ForumPost()
-
-    post_header = list_post.select_one(".posthead")
-    post.date = self.clean_string(post_header.select_one(".postdate"))
-    post.order = int(self.clean_string(post_header.select_one(".nodecontrols")).replace("#", ""))
-
-    post_details = list_post.select_one(".postdetails")
-    user_info = post_details.select_one(".userinfo")
-    post.username = self.clean_string(user_info.select_one(".username"))
-    post_body = post_details.select_one(".postbody")
-    post.title = self.clean_string(post_body.select_one(".title"))
-    post.contents = self.clean_string(post_body.select_one(".content"))
-
-    self.posts.append(post)
-
-class CustomForumParser(ForumParser):
-  def parse(self, posts_container: PageElement):
-    logger.debug(f"Parsing custom software - Element Count: {len(posts_container.contents)} | Config: {self.config}")
 
 def get_url_contents(url: AnyStr) -> Optional[AnyStr]:
   headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36"}
@@ -153,18 +170,13 @@ def get_url_contents(url: AnyStr) -> Optional[AnyStr]:
 def scrape_forum(url: AnyStr) -> AnyStr:
   url_contents = get_url_contents(url)
   soup = BeautifulSoup(url_contents, "html.parser")
-  posts = soup.find(id="posts")
-  if not posts:
+  software = soup.select_one("meta[name=\"generator\"]").attrs["content"]
+  if software not in DEFAULT_CONFIGS:
+    # TODO: Enable ability to specify custom config
     return "[]"
 
-  software = SoftwareType.CUSTOM
-  if posts.name == "ol":
-    software = SoftwareType.LIST_POSTS
-  if posts.name == "div" and posts.table is not None:
-    software = SoftwareType.TABLE_POSTS
-
-  forum_parser = ForumParser.for_software(software)
-  forum_parser.parse(posts)
+  forum_parser = ForumParser(software, DEFAULT_CONFIGS[software])
+  forum_parser.parse(soup)
 
   return json.dumps(forum_parser.to_json(), indent=2)
 
