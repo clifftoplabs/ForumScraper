@@ -14,6 +14,10 @@ You can run the solution with the following command:
 ```
 python3 forum_scraper.py -f input.txt
 ```
+or
+```
+python3 forum_scraper.py -u https://www.e90post.com/forums/showthread.php?t=1000,https://forums.hexus.net/showthread.php?t=1234
+```
 
 You can can also see a full list of options by looking at the help documentation:
 ```

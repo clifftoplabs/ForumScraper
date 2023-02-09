@@ -162,6 +162,8 @@ def scrape_forum(url: AnyStr) -> AnyStr:
   url_contents = get_url_contents(url)
   soup = BeautifulSoup(url_contents, "html.parser")
   posts = soup.find(id="posts")
+  if not posts:
+    return "[]"
 
   software = SoftwareType.CUSTOM
   if posts.name == "ol":
@@ -178,16 +180,20 @@ def scrape_forums(urls: List[AnyStr], is_debug: bool):
   with open(f"output.txt", "w+") as fp:
     for url in urls:
       contents = scrape_forum(url)
-      if is_debug:
-        fp.write(contents + "\n\n")
+      fp.write(contents + "\n\n")
 
-def get_urls(input_file: AnyStr, csv_urls: AnyStr):
-  # TODO: Implement reading input for URLs
-  logger.info(f" Input File: {input_file} | CSV Urls: {csv_urls}")
-  return [
-    "https://www.e90post.com/forums/showthread.php?t=1000",
-    "https://forums.hexus.net/showthread.php?t=1234"
-  ]
+def get_urls(input_file: Optional[AnyStr], csv_urls: Optional[AnyStr]):
+  if input_file is not None:
+    logger.debug(f"Input File: {input_file}")
+    with open(input_file, "r") as fp:
+      return [url.strip() for url in fp.readlines()]
+
+  if csv_urls is not None:
+    logger.debug(f"CSV Urls: {csv_urls}")
+    return csv_urls.split(",")
+
+  logger.error("One of --input-file or --csv-urls must be specified")
+  return []
 
 def main():
   # Parse the input arguments to get the run options and urls filename or csv
